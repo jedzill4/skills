@@ -72,6 +72,19 @@ Create or update this repo-local OpenCode config. Use JSONC because comments and
 
 If `opencode-sessions-explorer` is not installed and the user wants it, install/configure it using the project's normal OpenCode plugin workflow. Otherwise keep the config but mention the plugin must be available for the entry to load.
 
+## Skill Installation
+
+When setting up agent skills for a repo, install the selected upstream Matt Pocock skills from `mattpocock/skills`, then install this repo's two local skills. Do not vendor or install every upstream skill. Default to OpenCode:
+
+```bash
+npx skills add mattpocock/skills --agent opencode --yes --skill diagnose grill-with-docs triage improve-codebase-architecture tdd to-issues to-prd zoom-out prototype grill-me handoff write-a-skill
+npx skills add jedzill4/skills --agent opencode --yes --skill setup-repo journalist
+```
+
+If running from a local checkout of this skills repo, keep the Matt Pocock command as-is and install local skills with `npx skills add . --agent opencode --yes --skill setup-repo journalist --full-depth`.
+
+If the repo clearly uses Claude Code or Codex instead of OpenCode, ask before switching `--agent` to `claude-code` or `codex`.
+
 ## `AGENTS.md`
 
 Create or update this managed section in `AGENTS.md`. If the file already exists, add the section if missing. If the section exists, update only the lines inside this section and preserve everything else.
@@ -88,7 +101,7 @@ If creating a new `AGENTS.md`, add `# Agent Notes` before this section.
 - Preserve unrelated user changes and avoid destructive Git commands unless explicitly requested.
 ```
 
-For richer agent-skill docs, run the `setup-skills` skill after this one.
+For richer agent-skill docs, use Matt Pocock's upstream `setup-matt-pocock-skills` skill if installed.
 
 ## Verify
 
@@ -96,6 +109,7 @@ For richer agent-skill docs, run the `setup-skills` skill after this one.
 - `prek.toml` contains the generic hooks, and Python-specific hooks are present only when appropriate for the repo.
 - Python repos have a valid `pyproject.toml`; existing project metadata and dependencies were preserved.
 - `.opencode/opencode.jsonc` is valid JSONC and includes the schema, plugin, permission, and `mcp` sections.
+- Curated skills were installed for the right agent, defaulting to OpenCode unless the user chose another agent.
 - `AGENTS.md` exists and contains the `## Repo Workspace Defaults` section.
 - Existing `AGENTS.md` content outside `## Repo Workspace Defaults` was preserved.
 - No existing file content, config key, array item, or comment was removed without explicit user approval.
