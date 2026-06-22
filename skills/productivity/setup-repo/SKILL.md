@@ -61,6 +61,17 @@ Assume Python lives at the repo root by default, with `pyproject.toml` at the ro
 
 If a Python repo has no `pyproject.toml`, create one from `pyproject-template.toml` and replace placeholder project metadata. If `pyproject.toml` already exists, only add missing tool sections and never replace dependencies or project metadata without explicit approval.
 
+## `ast-grep` Rules
+
+The `ast-grep` hook in `prek-python.toml` runs `ast-grep scan`, which requires an `sgconfig.yml` at the repo root pointing at a rule directory. Whenever you add that hook, also scaffold the config and at least one rule, or the hook fails with "No configuration found."
+
+Create both additively, never overwriting existing rules:
+
+- Copy [sgconfig-template.yml](./sgconfig-template.yml) to the repo root as `sgconfig.yml`. It sets `ruleDirs: [ast-grep/rules]`.
+- Copy the starter rules from [ast-grep-rules/](./ast-grep-rules/) into `ast-grep/rules/`. They flag boundary functions that return raw dicts (`no-dict-call-return`, `no-dict-literal-return`, `no-dict-return-annotation`), nudging toward `@dataclass` or pydantic models.
+
+If `sgconfig.yml` already exists, preserve its `ruleDirs` and only add missing rule files. Drop or adjust individual rules to match the repo's conventions when the user asks; treat them as a starting point, not a mandate.
+
 ## `.opencode/opencode.jsonc`
 
 Create or update this repo-local OpenCode config from the bundled template [opencode-template.jsonc](./opencode-template.jsonc). Use JSONC because its comments and trailing commas are intentional. The template sets the `$schema`, the `opencode-sessions-explorer` and `opencode-varlock@latest` plugins, and `permission` rules that deny reading/writing/printing secrets (`.env*`, `*.pem`, `*.key`, `*credentials*`, `varlock.config`) while allowing common safe commands.
@@ -126,6 +137,7 @@ For richer agent-skill docs, use Matt Pocock's upstream `setup-matt-pocock-skill
 
 - `.gitignore` contains `.env`, `.tmp/`, `.scratch/`, `.worktrees/`, and `.journals/` exactly once.
 - `prek.toml` contains the generic hooks, and Python-specific hooks are present only when appropriate for the repo.
+- When the `ast-grep` hook is present, a root `sgconfig.yml` and at least one rule under `ast-grep/rules/` exist so `ast-grep scan` runs cleanly; existing rules were preserved.
 - Python repos have a valid `pyproject.toml`; existing project metadata and dependencies were preserved.
 - `.opencode/opencode.jsonc` is valid JSONC and includes the schema, plugin, permission, and `mcp` sections.
 - Varlock is installed (as a `package.json` dependency or standalone binary) and a root `.env.schema` exists and is tracked by Git, while `.env` files remain ignored.
