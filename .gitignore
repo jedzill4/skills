@@ -2,3 +2,5 @@
 .tmp
 .worktrees
 .env
+.agents
+skills-lock.json
