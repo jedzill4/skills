@@ -1,13 +1,13 @@
-# repo-setup
+# scaffolding
 
 Personal repo bootstrap + agent skills for OpenCode-first development.
 
 This repo does two things:
 
 1. **Bootstrap a repo** with my workspace defaults (gitignore, local OpenCode
-   config, `AGENTS.md` guidance, optional prek hooks, Varlock secrets). This is a
-   one-time-per-repo operation, run as an *agentic install* or a script — not an
-   installed skill.
+   config, `AGENTS.md` guidance, optional prek hooks, ast-grep, CI, Varlock
+   secrets) via a small Python CLI. This is a one-time-per-repo operation, run as
+   an *agentic install* or directly — not an installed skill.
 2. **Ship a couple of recurring skills** (`journalist`, `handoff`) that you
    install once and use repeatedly.
 
@@ -21,24 +21,53 @@ Run this from the root of the repo you want to set up.
 
 **Existing working repo (recommended): let an agent do it.** The bootstrap needs
 judgment — new-vs-existing detection, additive JSONC/`AGENTS.md` merges, Python
-detection, and per-item conflict resolution — so point your agent (OpenCode,
-Claude Code, Cursor, Amp, …) at the guide and have it follow every step:
+detection, and per-item conflict resolution. The CLI does the deterministic
+clean-adds; the agent drives it and handles merges. Point your agent at the guide:
 
 > Set up this repo by following the instructions here:
-> `https://raw.githubusercontent.com/jedzill4/repo-setup/main/setup/guide.md`
+> `https://raw.githubusercontent.com/jedzill4/scaffolding/main/guide.md`
 > Don't summarize it — follow every step.
 
-**New / empty repo (fast path): run the installer directly.** It does clean adds
-only and refuses to touch existing files, deferring any merge to the agent:
+**New / empty repo (fast path): run the CLI directly.** It does clean adds only
+and refuses to touch existing files, deferring any merge to the agent.
+
+Straight from git via `uvx` (no PyPI):
 
 ```bash
-# macOS / Linux / WSL
-curl -fsSL https://raw.githubusercontent.com/jedzill4/repo-setup/main/setup/install.sh | bash
+uvx --from git+https://github.com/jedzill4/scaffolding scaffolding install
 ```
 
-The installer is idempotent — safe to re-run. It also installs the recurring
-skills below. Override behavior with `AGENT=`, `SKIP_SKILLS=1`, or
-`SKIP_VARLOCK=1`.
+Or via the bootstrap shim (also installs `uv` if missing — preserves the classic
+one-liner):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jedzill4/scaffolding/main/install.sh | bash
+```
+
+The installer is idempotent — safe to re-run. Existing files are never edited or
+overwritten; they are reported as `[defer]` for the agent to merge.
+
+### Commands
+
+```
+scaffolding install [components…]   # clean-adds (all default-on, or just the named ones)
+scaffolding install --yes           # non-interactive / CI (conservative defaults)
+scaffolding install --dry-run       # render the plan, write nothing
+scaffolding plan --json             # machine-readable plan for the agent path
+scaffolding list                    # available components (gate / default / what they add)
+scaffolding check                   # verify bootstrap completeness (nonzero exit on failure)
+scaffolding doctor                  # diagnose environment + tools
+```
+
+Components: `gitignore opencode prek ast-grep pyproject ci agents skills
+varlock` (all default-on except `ci`, which is opt-in). Scope with positional
+names or `--skip a,b`. Useful flags: `--agent`, `--ci/--no-ci`, `--ci-parts`,
+`--name`, `--description`, `--varlock/--no-varlock`, `--no-deps`. Legacy env vars
+(`AGENT`, `SKIP_SKILLS`, `SKIP_VARLOCK`, `WITH_CI`/`SKIP_CI`, `ASSUME_YES`) are
+honored.
+
+There is no `uninstall`: the installer requires a git repo, so `git status` /
+`git checkout` / `git clean` are the undo mechanism.
 
 ## Installed skills
 
@@ -48,13 +77,13 @@ agent target is OpenCode.
 Install selected upstream skills from Matt Pocock:
 
 ```bash
-npx skills add mattpocock/skills --agent opencode --yes --skill diagnose grill-with-docs triage improve-codebase-architecture tdd to-issues to-prd zoom-out prototype grill-me write-a-skill
+npx skills add mattpocock/skills --agent opencode --yes --skill setup-matt-pocock-skills diagnose grill-with-docs triage improve-codebase-architecture tdd to-issues to-prd zoom-out prototype grill-me write-a-skill
 ```
 
 Then install my local skills from this repo:
 
 ```bash
-npx skills add jedzill4/repo-setup --agent opencode --yes --skill journalist handoff
+npx skills add jedzill4/scaffolding --agent opencode --yes --skill journalist handoff
 ```
 
 If installing from a checkout, run from this repo:
@@ -76,8 +105,11 @@ you actually use.
 
 ## What's in this repo
 
-- `setup/` — the repo bootstrap. `guide.md` (agentic-install guide),
-  `install.sh` (deterministic clean-adds installer), and `templates/`
-  (OpenCode config, prek hooks, pyproject, ast-grep rules, AGENTS.md section).
+- `scaffolding/` — the bootstrap CLI (Cyclopts + Questionary + pydantic-settings
+  + Rich). `cli.py`, `engine.py`/`plan.py`, `components.py`, and `templates/`
+  (OpenCode config, prek hooks, pyproject, ast-grep rules, CI workflows,
+  AGENTS.md section).
+- `install.sh` — thin bootstrap shim (ensure `uv`, then run the CLI from git).
+- `guide.md` — the agentic-install guide (judgment layer).
 - `skills/productivity/journalist` — local daily session journals under `.journals/`.
 - `skills/productivity/handoff` — compact the current session into a temp-dir handoff for another agent.

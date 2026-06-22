@@ -5,3 +5,12 @@
 .scratch
 .agents
 skills-lock.json
+
+# python / build
+.venv/
+dist/
+build/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+.ruff_cache/

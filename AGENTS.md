@@ -2,12 +2,21 @@
 
 ## Repo Layout
 
-- `setup/` — one-time repo bootstrap (not a skill): `guide.md` (agentic-install
-  guide), `install.sh` (deterministic clean-adds installer), and `templates/`.
-  When editing the bootstrap, keep `install.sh` clean-adds-only (never edit,
-  merge, or overwrite existing target files) and keep the raw URLs in `guide.md`
-  and `install.sh` pointing at `jedzill4/repo-setup` on `main`.
+- `scaffolding/` — the bootstrap CLI (Python package, run via
+  `uvx --from git+…/scaffolding scaffolding …`). `cli.py` (Cyclopts commands),
+  `engine.py`/`plan.py` (build + apply, clean-adds only), `components.py`
+  (component registry), `templates/` (bundled package data). The CLI is the
+  single deterministic engine; keep it **clean-adds-only** — it must never edit,
+  merge, or overwrite existing target files (existing targets are deferred).
+- `install.sh` — thin bootstrap shim (ensure `uv`, then `uvx … scaffolding
+  install`). Keep it minimal and keep its raw URL pointing at
+  `jedzill4/scaffolding` on `main`.
+- `guide.md` — the agentic-install guide (judgment layer that drives the CLI and
+  handles merges). Keep template raw URLs pointing at `jedzill4/scaffolding`.
 - `skills/` — actual installed skills (`journalist`, `handoff`).
+
+After changing the CLI, validate with `uv run ruff check scaffolding` and
+`uv run scaffolding --help`.
 
 ## Skill Development
 
@@ -20,3 +29,21 @@ tessl skill review <SKILL.md>
 
 Run it against each changed skill (e.g. `tessl skill review skills/productivity/journalist/SKILL.md`)
 and resolve the reported issues before publishing.
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown — issues and PRDs live under `.scratch/<feature>/`. External PRs
+are not a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical role strings (`needs-triage`, `needs-info`, `ready-for-agent`,
+`ready-for-human`, `wontfix`), recorded as a `Status:` line per issue file. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — `CONTEXT.md` + `docs/adr/` at the repo root (created lazily).
+See `docs/agents/domain.md`.
