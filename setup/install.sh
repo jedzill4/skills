@@ -60,7 +60,9 @@ write_if_absent() {
 
 # --- .gitignore --------------------------------------------------------------
 ensure_gitignore() {
-  local entries=(".env" ".tmp/" ".scratch/" ".worktrees/" ".journals/")
+  # .env.schema is the committed source of truth — keep it tracked even if a
+  # broader .env* pattern is added later.
+  local entries=(".env" "!.env.schema" ".tmp/" ".scratch/" ".worktrees/" ".journals/")
   [ -e .gitignore ] || { : > .gitignore; add ".gitignore"; }
   local e
   for e in "${entries[@]}"; do
@@ -78,7 +80,7 @@ is_python_repo() { [ -f pyproject.toml ] || ls ./*.py >/dev/null 2>&1; }
 
 # --- opencode config ---------------------------------------------------------
 ensure_opencode() {
-  write_if_absent "$TEMPLATES/opencode-template.jsonc" ".opencode/opencode.jsonc"
+  write_if_absent "$TEMPLATES/opencode-template.jsonc" "opencode.jsonc"
 }
 
 # --- prek hooks --------------------------------------------------------------

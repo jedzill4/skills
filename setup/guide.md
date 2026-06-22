@@ -23,7 +23,7 @@ Prepare an existing project repo with the small defaults I usually want before a
 1. Inspect the repo root for existing `.gitignore`, `.opencode/`, `opencode.json`, `opencode.jsonc`, `prek.toml`, `AGENTS.md`, `CLAUDE.md`, `.env.schema`, and any `.env*` files.
 2. Decide whether this is a clean setup (new/empty repo) or a migration into an existing working repo. See [New vs. Existing Repos (Migration)](#new-vs-existing-repos-migration). For a migration, present the installation plan and get the user's decision before writing anything beyond inspection.
 3. Preserve existing content. Only add missing files, missing lines, or missing config keys. Never delete, replace, reorder, or simplify existing data without explicit user authorization.
-4. Prefer repo-local OpenCode config at `.opencode/opencode.jsonc` so the settings travel with this repo and do not overwrite global config.
+4. Prefer repo-local OpenCode config at root `opencode.jsonc` so the settings travel with this repo and do not overwrite global config.
 5. Add or update the managed workspace section in `AGENTS.md`. Create `AGENTS.md` if it does not exist. Do not edit `CLAUDE.md` during this bootstrap unless the user explicitly asks.
 6. Validate that any JSON/JSONC you wrote parses or is accepted by the relevant tool.
 
@@ -33,7 +33,7 @@ Prepare an existing project repo with the small defaults I usually want before a
 
 **Existing working repo (migration).** When any of those already exist, do not silently change an active project. Inspect first, then present a short installation plan and wait for the user's go-ahead, sorting every change into three buckets:
 
-- **Clean adds** — missing files/entries that only add new content (e.g. a missing `.gitignore` line, a brand-new `.opencode/opencode.jsonc`). Apply once approved.
+- **Clean adds** — missing files/entries that only add new content (e.g. a missing `.gitignore` line, a brand-new root `opencode.jsonc`). Apply once approved.
 - **Merges** — additive edits to existing files (missing keys in `opencode.jsonc`, extra `prek.toml` hooks, the `AGENTS.md` section, new `pyproject.toml` tool sections). Show what gets inserted and confirm no collisions.
 - **Conflicts** — anything that would remove, replace, reorder, or restructure existing content, or where the user's value differs (e.g. an existing `.env.example`/`.env.schema` `varlock init` might rewrite, a `.gitignore` already handling `.env` differently, clashing permission rules). Never auto-resolve; let the user decide per item and default to the most conservative option.
 
@@ -48,10 +48,13 @@ This bootstrap is additive by default:
 
 ## `.gitignore`
 
-Ensure these workspace-only directories are ignored at the repo root:
+Ensure these workspace-only directories are ignored at the repo root. Keep
+`.env.schema` tracked — it is the committed source of truth, so never ignore it
+(the `!.env.schema` negation guards against a broader `.env*` pattern):
 
 ```
 .env
+!.env.schema
 .tmp/
 .scratch/
 .worktrees/
@@ -83,9 +86,9 @@ Create both additively, never overwriting existing rules:
 
 If `sgconfig.yml` already exists, preserve its `ruleDirs` and only add missing rule files. Drop or adjust individual rules to match the repo's conventions when the user asks; treat them as a starting point, not a mandate.
 
-## `.opencode/opencode.jsonc`
+## `opencode.jsonc`
 
-Create or update this repo-local OpenCode config from the bundled template [opencode-template.jsonc](https://raw.githubusercontent.com/jedzill4/repo-setup/main/setup/templates/opencode-template.jsonc). Use JSONC because its comments and trailing commas are intentional. The template sets the `$schema`, the `opencode-sessions-explorer` and `opencode-varlock@latest` plugins, and `permission` rules that deny reading/writing/printing secrets (`.env*`, `*.pem`, `*.key`, `*credentials*`, `varlock.config`) while allowing common safe commands.
+Create or update this repo-local OpenCode config at the **repo root** (`opencode.jsonc`, not under `.opencode/`) from the bundled template [opencode-template.jsonc](https://raw.githubusercontent.com/jedzill4/repo-setup/main/setup/templates/opencode-template.jsonc). Use JSONC because its comments and trailing commas are intentional. The template sets the `$schema`, the `opencode-sessions-explorer` and `opencode-varlock@latest` plugins, and `permission` rules that deny reading/writing/printing secrets (`.env*`, `*.pem`, `*.key`, `*credentials*`, `varlock.config`) while allowing common safe commands.
 
 Merge it additively into any existing config: add only missing keys, plugin entries, and permission rules, and preserve the user's existing values (see [Non-Destructive Edits](#non-destructive-edits)).
 
@@ -93,7 +96,7 @@ If `opencode-sessions-explorer` is not installed and the user wants it, install/
 
 ## Varlock Secret Management
 
-Use [Varlock](https://varlock.dev) for environment and secret management so secrets stay out of the repo and out of agent context. The `opencode-varlock@latest` plugin in `.opencode/opencode.jsonc` and the `.env*` permission guards above assume Varlock is installed and the repo carries a committed `.env.schema`.
+Use [Varlock](https://varlock.dev) for environment and secret management so secrets stay out of the repo and out of agent context. The `opencode-varlock@latest` plugin in root `opencode.jsonc` and the `.env*` permission guards above assume Varlock is installed and the repo carries a committed `.env.schema`.
 
 Install Varlock and scaffold the schema additively. Never overwrite an existing `.env.schema` or `.env` without explicit user approval.
 
@@ -146,11 +149,11 @@ For richer agent-skill docs, use Matt Pocock's upstream `setup-matt-pocock-skill
 
 ## Verify
 
-- `.gitignore` contains `.env`, `.tmp/`, `.scratch/`, `.worktrees/`, and `.journals/` exactly once.
+- `.gitignore` contains `.env`, `.tmp/`, `.scratch/`, `.worktrees/`, and `.journals/` exactly once, and does not ignore `.env.schema` (the `!.env.schema` negation is present).
 - `prek.toml` contains the generic hooks, and Python-specific hooks are present only when appropriate for the repo.
 - When the `ast-grep` hook is present, a root `sgconfig.yml` and at least one rule under `ast-grep/rules/` exist so `ast-grep scan` runs cleanly; existing rules were preserved.
 - Python repos have a valid `pyproject.toml`; existing project metadata and dependencies were preserved.
-- `.opencode/opencode.jsonc` is valid JSONC and includes the schema, plugin, permission, and `mcp` sections.
+- Root `opencode.jsonc` is valid JSONC and includes the schema, plugin, permission, and `mcp` sections.
 - Varlock is installed (as a `package.json` dependency or standalone binary) and a root `.env.schema` exists and is tracked by Git, while `.env` files remain ignored.
 - Curated skills were installed for the right agent, defaulting to OpenCode unless the user chose another agent, including the `dmno-dev/varlock` skill.
 - `AGENTS.md` exists and contains the `## Repo Workspace Defaults` section, including the `### Resource Limits For Heavy Commands` subsection covering `systemd-run` caps, `/usr/bin/time -v` logging to `.tmp/logs/`, background execution with a monitor sub-agent, flushed progress output from our own scripts, and tail-only log reading.
