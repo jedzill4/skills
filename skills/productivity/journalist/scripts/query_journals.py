@@ -18,8 +18,6 @@ class Entry:
     text: str
 
 
-# Generic key/value frontmatter parser; a dict is the natural representation.
-# ast-grep-ignore: no-dict-return-annotation
 def parse_frontmatter(text: str) -> dict[str, str]:
     metadata: dict[str, str] = {}
     if not text.startswith("---\n"):

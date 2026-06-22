@@ -9,7 +9,7 @@ import pytest
 
 from scaffolding.engine import UnknownComponent, apply, build_plan, select_components
 from scaffolding.facts import detect
-from scaffolding.plan import Disposition
+from scaffolding.plan import Decisions, Disposition
 from scaffolding.settings import Settings
 
 
@@ -94,7 +94,7 @@ def test_apply_is_clean_adds_only_and_idempotent(repo: Path):
 
 def test_pyproject_substitution(repo: Path):
     (repo / "app.py").write_text("x = 1\n")
-    decisions = {"pyproject_name": "demo-pkg", "pyproject_description": "A demo"}
+    decisions = Decisions(pyproject_name="demo-pkg", pyproject_description="A demo")
     plan = build_plan(repo, _facts(repo), Settings(), requested=["pyproject"], decisions=decisions)
     apply(plan, repo)
     body = (repo / "pyproject.toml").read_text()

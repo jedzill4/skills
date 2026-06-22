@@ -8,7 +8,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from .facts import detect
+from scaffolding.facts import detect
 
 
 @dataclass
@@ -48,14 +48,11 @@ def probe_tools() -> list[Probe]:
     return probes
 
 
-# JSON-serialization boundary: dict is the JSON representation here.
-# ast-grep-ignore: no-dict-return-annotation
-def repo_state(root: Path | None = None) -> dict[str, object]:
+def repo_state(root: Path | None = None) -> list[tuple[str, object]]:
     facts = detect(root)
-    state: dict[str, object] = {
-        "git repo root": facts.is_git_repo,
-        "python repo": facts.is_python,
-        "Dockerfile": facts.has_dockerfile,
-        "visibility": facts.visibility,
-    }
-    return state
+    return [
+        ("git repo root", facts.is_git_repo),
+        ("python repo", facts.is_python),
+        ("Dockerfile", facts.has_dockerfile),
+        ("visibility", facts.visibility),
+    ]

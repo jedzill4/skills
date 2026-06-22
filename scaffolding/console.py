@@ -5,7 +5,7 @@ from __future__ import annotations
 from rich.console import Console
 from rich.table import Table
 
-from .plan import Disposition, Plan
+from scaffolding.plan import Disposition, Plan
 
 console = Console()
 err_console = Console(stderr=True)

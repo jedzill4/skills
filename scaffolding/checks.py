@@ -8,7 +8,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from .components import AGENTS_MARKER, GITIGNORE_ENTRIES
+from scaffolding.components import AGENTS_MARKER, GITIGNORE_ENTRIES
 
 
 @dataclass

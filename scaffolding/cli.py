@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-import json as _json
 from dataclasses import replace
 from pathlib import Path
 
 from cyclopts import App
 
-from . import console, prompts
-from .checks import run_checks
-from .components import AGENT_CHOICES, ALL_CI_PARTS, DEFAULT_CI_PARTS, REGISTRY
-from .doctor import probe_tools, repo_state
-from .engine import UnknownComponent, build_plan
-from .facts import Facts, detect
-from .plan import Plan
-from .settings import Settings
+from scaffolding import console, prompts
+from scaffolding.checks import run_checks
+from scaffolding.components import AGENT_CHOICES, ALL_CI_PARTS, DEFAULT_CI_PARTS, REGISTRY
+from scaffolding.doctor import probe_tools, repo_state
+from scaffolding.engine import UnknownComponent, build_plan
+from scaffolding.facts import Facts, detect
+from scaffolding.plan import Decisions, Plan
+from scaffolding.settings import Settings
 
 app = App(
     name="scaffolding",
@@ -44,40 +43,33 @@ def _split(s: str | None) -> list[str]:
     return [x.strip() for x in s.split(",") if x.strip()] if s else []
 
 
-# Dynamic decision map, keyed by component; consumed generically by key.
-# ast-grep-ignore: no-dict-return-annotation
 def _seed_decisions(
     name: str | None, description: str | None, varlock: bool | None, ci_parts: str | None
-) -> dict[str, object]:
-    d: dict[str, object] = {}
-    if name:
-        d["pyproject_name"] = name
-    if description:
-        d["pyproject_description"] = description
-    if varlock is not None:
-        d["varlock"] = varlock
-    if ci_parts:
-        d["ci_parts"] = [p.strip() for p in ci_parts.split(",") if p.strip()]
-    return d
+) -> Decisions:
+    return Decisions(
+        pyproject_name=name,
+        pyproject_description=description,
+        varlock=varlock,
+        ci_parts=_split(ci_parts) or None,
+    )
 
 
-def _resolve_decisions(plan: Plan, settings: Settings, decisions: dict) -> None:
+def _resolve_decisions(plan: Plan, settings: Settings, decisions: Decisions) -> None:
     ay = settings.assume_yes
     for dec in plan.decisions:
-        if dec.key in decisions:
+        if getattr(decisions, dec.key) is not None:
             continue
         if dec.key == "agent":
-            decisions[dec.key] = prompts.select(
-                dec.question, AGENT_CHOICES, dec.default, assume_yes=ay
-            )
+            value = prompts.select(dec.question, AGENT_CHOICES, dec.default, assume_yes=ay)
         elif dec.key in ("pyproject_name", "pyproject_description"):
-            decisions[dec.key] = prompts.text(dec.question, dec.default, assume_yes=ay)
+            value = prompts.text(dec.question, dec.default, assume_yes=ay)
         elif dec.key == "ci_parts":
-            decisions[dec.key] = prompts.checkbox(
-                dec.question, ALL_CI_PARTS, DEFAULT_CI_PARTS, assume_yes=ay
-            )
+            value = prompts.checkbox(dec.question, ALL_CI_PARTS, DEFAULT_CI_PARTS, assume_yes=ay)
         elif dec.key == "varlock":
-            decisions[dec.key] = prompts.confirm(dec.question, False, assume_yes=ay)
+            value = prompts.confirm(dec.question, False, assume_yes=ay)
+        else:
+            continue
+        setattr(decisions, dec.key, value)
 
 
 def _gate_label(comp) -> str:
@@ -158,7 +150,7 @@ def install(
         console.render_plan_table(plan, title="Plan (dry-run — nothing written)")
         return
 
-    from .engine import apply
+    from scaffolding.engine import apply
 
     code = apply(plan, root)
     console.console.print(
@@ -204,7 +196,7 @@ def plan_cmd(
         raise SystemExit(2) from exc
 
     if json:
-        print(_json.dumps(plan.to_json_obj(), indent=2))
+        print(plan.report().model_dump_json(indent=2))
     else:
         console.render_plan_table(plan, title="Plan")
 
@@ -271,8 +263,8 @@ def doctor():
     state = Table(title="Repo")
     state.add_column("fact", no_wrap=True)
     state.add_column("value")
-    for k, v in repo_state(Path.cwd()).items():
-        state.add_row(k, str(v))
+    for label, value in repo_state(Path.cwd()):
+        state.add_row(label, str(value))
     console.console.print(state)
 
 

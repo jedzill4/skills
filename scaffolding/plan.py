@@ -1,9 +1,13 @@
-"""Plan / Op data model and JSON serialization (the Model A backbone)."""
+"""Plan / Op model and the pydantic report used at the JSON serialization boundary."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+
+from pydantic import BaseModel
+
+from scaffolding.facts import Facts
 
 
 class Disposition(StrEnum):
@@ -28,18 +32,6 @@ class Op:
     cmd: list[str] | None = None
     optional: bool = False
 
-    # JSON-serialization boundary: dict is the JSON representation here.
-    # ast-grep-ignore: no-dict-return-annotation
-    def to_dict(self) -> dict[str, object]:
-        obj: dict[str, object] = {
-            "component": self.component,
-            "kind": self.kind,
-            "target": self.target,
-            "disposition": self.disposition.value,
-            "detail": self.detail,
-        }
-        return obj
-
 
 @dataclass
 class Decision:
@@ -50,21 +42,44 @@ class Decision:
     question: str
     default: str
 
-    # JSON-serialization boundary: dict is the JSON representation here.
-    # ast-grep-ignore: no-dict-return-annotation
-    def to_dict(self) -> dict[str, object]:
-        obj: dict[str, object] = {
-            "tier": self.tier,
-            "key": self.key,
-            "question": self.question,
-            "default": self.default,
-        }
-        return obj
+
+class Decisions(BaseModel):
+    """User answers to Tier-2/3 decisions; field names match ``Decision.key``."""
+
+    agent: str | None = None
+    pyproject_name: str | None = None
+    pyproject_description: str | None = None
+    ci_parts: list[str] | None = None
+    varlock: bool | None = None
+
+
+class OpView(BaseModel):
+    """Serialization-safe projection of an Op (omits file contents and cmd)."""
+
+    component: str
+    kind: str
+    target: str
+    disposition: Disposition
+    detail: str
+
+
+class PlanReport(BaseModel):
+    """The pydantic model emitted by ``plan --json`` — the serialization boundary."""
+
+    facts: Facts
+    clean_adds: list[OpView]
+    runs: list[OpView]
+    skips: list[OpView]
+    defers: list[OpView]
+    warnings: list[OpView]
+    decisions_needed: list[Decision]
+    deferred_merges: list[str]
+    notices: list[str]
 
 
 @dataclass
 class Plan:
-    facts: dict
+    facts: Facts
     ops: list[Op] = field(default_factory=list)
     decisions: list[Decision] = field(default_factory=list)
     notices: list[str] = field(default_factory=list)
@@ -76,18 +91,29 @@ class Plan:
     def deferred_merges(self) -> list[str]:
         return [o.target for o in self.by(Disposition.DEFER)]
 
-    # JSON-serialization boundary: dict is the JSON representation here.
-    # ast-grep-ignore: no-dict-return-annotation
-    def to_json_obj(self) -> dict[str, object]:
-        obj: dict[str, object] = {
-            "facts": self.facts,
-            "clean_adds": [o.to_dict() for o in self.by(Disposition.ADD)],
-            "runs": [o.to_dict() for o in self.by(Disposition.RUN)],
-            "skips": [o.to_dict() for o in self.by(Disposition.SKIP)],
-            "defers": [o.to_dict() for o in self.by(Disposition.DEFER)],
-            "warnings": [o.to_dict() for o in self.by(Disposition.WARN)],
-            "decisions_needed": [d.to_dict() for d in self.decisions],
-            "deferred_merges": self.deferred_merges,
-            "notices": self.notices,
-        }
-        return obj
+    def report(self) -> PlanReport:
+        """Build the pydantic report consumed by ``plan --json``."""
+
+        def view(disp: Disposition) -> list[OpView]:
+            return [
+                OpView(
+                    component=o.component,
+                    kind=o.kind,
+                    target=o.target,
+                    disposition=o.disposition,
+                    detail=o.detail,
+                )
+                for o in self.by(disp)
+            ]
+
+        return PlanReport(
+            facts=self.facts,
+            clean_adds=view(Disposition.ADD),
+            runs=view(Disposition.RUN),
+            skips=view(Disposition.SKIP),
+            defers=view(Disposition.DEFER),
+            warnings=view(Disposition.WARN),
+            decisions_needed=self.decisions,
+            deferred_merges=self.deferred_merges,
+            notices=self.notices,
+        )

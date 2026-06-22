@@ -13,10 +13,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .facts import Facts
-from .plan import Decision, Disposition, Op
-from .settings import Settings
-from .templates_registry import template_text
+from scaffolding.facts import Facts
+from scaffolding.plan import Decision, Decisions, Disposition, Op
+from scaffolding.settings import Settings
+from scaffolding.templates_registry import template_text
 
 GITIGNORE_ENTRIES = [".env", "!.env.schema", ".tmp/", ".scratch/", ".worktrees/", ".journals/"]
 AGENTS_MARKER = "## Repo Workspace Defaults"
@@ -50,7 +50,7 @@ class Context:
     root: Path
     facts: Facts
     settings: Settings
-    decisions: dict
+    decisions: Decisions
     interactive: bool
     _decisions: list[Decision] = field(default_factory=list)
 
@@ -230,8 +230,8 @@ def plan_pyproject(ctx: Context) -> list[Op]:
                 detail=f"already exists — merge via guide: {ctx.guide_url}",
             )
         ]
-    name = ctx.decisions.get("pyproject_name") or infer_project_name(ctx.root)
-    desc = ctx.decisions.get("pyproject_description") or f"{name} project"
+    name = ctx.decisions.pyproject_name or infer_project_name(ctx.root)
+    desc = ctx.decisions.pyproject_description or f"{name} project"
     ctx.add_decision(Decision(2, "pyproject_name", "Project name?", name))
     ctx.add_decision(Decision(2, "pyproject_description", "Project description?", desc))
     content = (
@@ -253,7 +253,7 @@ def plan_pyproject(ctx: Context) -> list[Op]:
 
 
 def plan_ci(ctx: Context) -> list[Op]:
-    parts = ctx.decisions.get("ci_parts") or DEFAULT_CI_PARTS
+    parts = ctx.decisions.ci_parts or DEFAULT_CI_PARTS
     ctx.add_decision(
         Decision(
             2,
@@ -382,7 +382,7 @@ def plan_skills(ctx: Context) -> list[Op]:
         return [Op("skills", "noop", "skills", Disposition.SKIP, detail="SKIP_SKILLS set")]
     if not ctx.facts.has_npx:
         return [Op("skills", "noop", "skills", Disposition.SKIP, detail="npx not found")]
-    agent = ctx.decisions.get("agent") or ctx.settings.agent
+    agent = ctx.decisions.agent or ctx.settings.agent
     ctx.add_decision(
         Decision(2, "agent", "Which agent target? (opencode/claude-code/codex)", agent)
     )
@@ -442,7 +442,7 @@ def plan_varlock(ctx: Context) -> list[Op]:
                 3, "varlock", "Run varlock init? .env.example exists and may be rewritten", "no"
             )
         )
-        if not ctx.decisions.get("varlock"):
+        if not ctx.decisions.varlock:
             return [
                 Op(
                     "varlock",

@@ -5,11 +5,11 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from . import console
-from .components import REGISTRY, Component, Context, lookup
-from .facts import Facts
-from .plan import Disposition, Op, Plan
-from .settings import Settings
+from scaffolding import console
+from scaffolding.components import REGISTRY, Component, Context, lookup
+from scaffolding.facts import Facts
+from scaffolding.plan import Decisions, Disposition, Op, Plan
+from scaffolding.settings import Settings
 
 
 class NotAGitRepo(Exception):
@@ -89,7 +89,7 @@ def build_plan(
     *,
     requested: list[str] | None = None,
     skip: list[str] | None = None,
-    decisions: dict | None = None,
+    decisions: Decisions | None = None,
     interactive: bool = False,
 ) -> Plan:
     components, notices = select_components(requested or [], skip or [], facts, settings)
@@ -97,10 +97,10 @@ def build_plan(
         root=root,
         facts=facts,
         settings=settings,
-        decisions=decisions or {},
+        decisions=decisions if decisions is not None else Decisions(),
         interactive=interactive,
     )
-    plan = Plan(facts=facts.to_dict(), notices=notices)
+    plan = Plan(facts=facts, notices=notices)
     for comp in components:
         plan.ops.extend(comp.plan(ctx))
     plan.decisions = list(ctx._decisions)

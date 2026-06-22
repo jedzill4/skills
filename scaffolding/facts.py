@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import shutil
 import subprocess
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -21,11 +21,6 @@ class Facts:
     has_varlock: bool
     has_uv: bool
     has_curl: bool
-
-    # JSON-serialization boundary: dict is the JSON representation here.
-    # ast-grep-ignore: no-dict-return-annotation
-    def to_dict(self) -> dict[str, object]:
-        return asdict(self)
 
 
 def _has(cmd: str) -> bool:
