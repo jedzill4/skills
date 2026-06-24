@@ -109,6 +109,7 @@ project-excludes = [
   "**/__pycache__",
   "**/.venv/**/*",
   "skills/**/*",
+  "review/**/*",  # separate distribution with its own env/import-root
 ]
 use-ignore-files = false
 disable-project-excludes-heuristics = true
