@@ -20,8 +20,8 @@ name: opencode
 env:
   # Per-provider model ids (provider/model). Both kept here so switching the
   # active provider is just repointing `with: model:` below.
-  NVIDIA_MODEL: nvidia/qwen/qwen3-coder-480b-a35b-instruct
-  ZAI_MODEL: zai/glm-4.7
+  NVIDIA_MODEL: nvidia/nemotron-3-ultra-550b-a55b
+  ZAI_MODEL: zai/glm-5.1
 
 on:
   issue_comment:
