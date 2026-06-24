@@ -346,15 +346,16 @@ def plan_ci(ctx: Context) -> list[Op]:
                 )
             )
     if "opencode" in parts:
-        ops.append(
-            _write_if_absent(
-                "ci",
-                ctx.root / ".github/workflows/opencode.yml",
-                template_text("github/workflows/opencode.yml"),
-                ".github/workflows/opencode.yml",
-                ctx.guide_url,
+        for wf in ("opencode.yml", "proposal-update.yml"):
+            ops.append(
+                _write_if_absent(
+                    "ci",
+                    ctx.root / f".github/workflows/{wf}",
+                    template_text(f"github/workflows/{wf}"),
+                    f".github/workflows/{wf}",
+                    ctx.guide_url,
+                )
             )
-        )
     if not ops:
         ops.append(Op("ci", "noop", "ci", Disposition.SKIP, detail="no applicable CI parts"))
     return ops

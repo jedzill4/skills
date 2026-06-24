@@ -1,0 +1,107 @@
+name: proposal-update
+
+# Comment "/update-proposal <instructions>" on an issue and this rewrites the
+# issue body (the proposal) in place — it never touches repository files or
+# opens a PR. Generation is done by `opencode run` (reusing the same NVIDIA /
+# Z.AI keys as opencode.yml); the write-back is a deterministic `gh issue edit`,
+# so the model only ever produces text — it cannot wander into editing code.
+#
+# Split of responsibilities:
+#   /oc ...               -> general agent (opencode.yml): can edit code, open PRs
+#   /update-proposal ...  -> this workflow: rewrites the current issue body only
+env:
+  # Same per-provider model ids as opencode.yml. Switch the active provider by
+  # pointing GEN_MODEL at the other one.
+  NVIDIA_MODEL: nvidia/nvidia/nemotron-3-ultra-550b-a55b
+  ZAI_MODEL: zai/glm-5.1
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: proposal-update-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  update-proposal:
+    # Real issues only (not PR comments), and only when explicitly invoked.
+    if: |
+      github.event.issue.pull_request == null &&
+      contains(github.event.comment.body, '/update-proposal')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install opencode
+        run: |
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch issue context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue view "$ISSUE_NUMBER" --repo "$REPO" \
+            --json number,title,body,comments > issue.json
+
+      - name: Generate updated proposal body
+        env:
+          # opencode reads provider keys from the environment.
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+          GEN_MODEL: ${{ env.NVIDIA_MODEL }}
+        run: |
+          set -o pipefail
+          opencode run --model "$GEN_MODEL" \
+            'Read ./issue.json — it is a GitHub issue (number, title, body,
+             comments) describing a proposal. Read the repository as needed to
+             ground the proposal in the actual code. Then produce an improved,
+             complete replacement Markdown body for the proposal that
+             incorporates the discussion in the comments. Do NOT modify any
+             repository files. Output ONLY the final Markdown body: no code
+             fences, no preamble, no trailing commentary.' \
+            > updated_body.md 2> opencode.log || { cat opencode.log; exit 1; }
+
+      - name: Validate generated body
+        run: |
+          # Strip a wrapping ```lang … ``` fence if the model added one.
+          if head -1 updated_body.md | grep -q '^```'; then
+            sed -i '1d' updated_body.md
+            tail -1 updated_body.md | grep -q '^```$' && sed -i '$d' updated_body.md
+          fi
+          # Drop leading blank lines, then sanity-check.
+          sed -i '/./,$!d' updated_body.md
+          test -s updated_body.md
+          head -1 updated_body.md | grep -q '^#' || {
+            echo "Generated body does not look like a proposal (no leading heading)."
+            echo "----- generated -----"; cat updated_body.md
+            exit 1
+          }
+
+      - name: Update issue body
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --body-file updated_body.md
+
+      - name: Comment confirmation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --repo "$REPO" \
+            --body "Updated the proposal body from this comment. ([run]($RUN_URL))"
