@@ -34,6 +34,8 @@ class Issue:
     priority: str
     area: str
     enforcers: list[str] = field(default_factory=list)
+    updated_at: str = ""
+    comment_count: int = 0
 
     @property
     def sort_key(self) -> tuple[int, int]:
@@ -42,6 +44,11 @@ class Issue:
     @property
     def enforcer_text(self) -> str:
         return ",".join(self.enforcers)
+
+    @property
+    def updated_short(self) -> str:
+        """Date portion of the ISO updatedAt timestamp (sortable, compact)."""
+        return self.updated_at[:10]
 
 
 @dataclass
@@ -92,6 +99,8 @@ def normalise(raw: dict) -> Issue:
         priority=_label_value(labels, "priority:") or "medium",
         area=_label_value(labels, "area:"),
         enforcers=_label_values(labels, "enforcer:"),
+        updated_at=raw.get("updatedAt", ""),
+        comment_count=len(raw.get("comments") or []),
     )
 
 
@@ -107,11 +116,11 @@ def list_issues(repo: str = REPO, limit: int = 300) -> list[Issue]:
             "--limit",
             str(limit),
             "--json",
-            "number,title,labels,state",
+            "number,title,labels,state,updatedAt,comments",
         ]
     )
     issues = [normalise(r) for r in json.loads(out)]
-    issues.sort(key=lambda i: i.sort_key)
+    issues.sort(key=lambda i: i.sort_key)  # priority-first default; the TUI re-sorts on demand
     return issues
 
 
