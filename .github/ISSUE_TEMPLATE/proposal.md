@@ -47,3 +47,7 @@ The issue NUMBER is the stable id. Priority/state are labels, never the number.
 
 ## References
 <!-- Provenance file, related proposals (#ids), semantic anchor links. -->
+
+## Changelog
+<!-- One-line summary per revision, oldest first. `/update-proposal` appends here. -->
+- Initial proposal.
