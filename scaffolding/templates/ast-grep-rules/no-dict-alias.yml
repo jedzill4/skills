@@ -1,7 +1,7 @@
 id: no-dict-alias
 language: python
 severity: error
-message: "CES-79 (no-dict-alias): Type alias points at a raw dict. Aliasing `dict` to a name hides a raw-dict boundary from the no-dict-return rules. Prefer a @dataclass (internal boundaries) or a pydantic BaseModel (where validation is needed). If a dict truly is correct (e.g. a JSON-serialization boundary), keep the `dict` annotation and add an explicit `# ast-grep-ignore: no-dict-return-annotation` at the call site so the exception is visible."
+message: "CES-79 (no-dict-alias): Type alias points at a raw dict, hiding a raw-dict boundary behind a name. Prefer a @dataclass for internal boundaries, or a pydantic BaseModel where validation is needed (e.g. FastAPI endpoints)."
 rule:
   any:
     # X = dict / X = dict[...]

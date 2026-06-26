@@ -49,6 +49,10 @@ or referencing a rule in this repo, follow this convention:
 - **Violation messages must embed the code**, e.g.
   `message: "CES-46 (log-no-print): libraries log, they don't print …"`. Keep the
   slug as the suppression key so tooling stays stable.
+- **Messages are self-contained:** a message states its own rule + fix + code, and
+  **never** names a sibling rule or prescribes another rule's suppression key.
+  Grouped rationale + the escape-hatch mechanism live once, in the detail file —
+  scattering policy across sibling messages is context-poisoning.
 - Canonical map + per-rule detail live in the `## Engineering Standards` index and
   `.agents/rules/<slug>.md`; canonical code lives in `snippets/`.
 

@@ -13,23 +13,37 @@ packages = ["src"]
 [tool.ruff]
 line-length = 100
 
+[tool.ruff.format]
+quote-style = "double"
+
 [tool.ruff.lint]
 select = [
   "E",
   "F",
+  "I",
+  "C4",
+  "C90",
+  "ICN",
+  "INP",
+  "PIE",
+  "PT",
+  "TC",
+  "PGH",
+  "NPY",
+  "PLE",
+  "PLW",
+  "FA",
   "B",
+  "S",
+  "G",
   "SIM",
   "RET",
-  "C4",
   "DTZ",
   "PTH",
   "LOG",
-  "S",
-  "C90",
-  "G",
+  "TID",
   "UP",
   "RUF",
-  "TID",
   "ERA001",
   "D200",
   "D205",
@@ -53,6 +67,7 @@ select = [
   "D417",
   "D418",
   "D419",
+  "PERF",
 ]
 task-tags = ["TODO", "FIXME", "XXX", "MARK"]
 
@@ -68,7 +83,7 @@ max-complexity = 10
 ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "INP001"]
 
 # MARK: Pyrefly
 [tool.pyrefly]

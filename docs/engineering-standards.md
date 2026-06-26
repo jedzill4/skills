@@ -43,6 +43,21 @@ message: "CES-46 (log-no-print): libraries log, they don't print — use the hou
 The slug remains the suppression key (`# ast-grep-ignore: <slug>`), so embedding the code in
 the message text never affects tooling stability.
 
+### Messages are self-contained (no cross-rule references)
+
+A violation message states **its own** rule, the fix, and its CES code — nothing else. It must
+**not**:
+
+- name a sibling rule (e.g. "hidden from the no-dict-return rules"), or
+- prescribe another rule's suppression key (a message for `no-dict-alias` telling you to add
+  `# ast-grep-ignore: no-dict-return-annotation` is wrong — and wouldn't even silence itself).
+
+Scattering policy across sibling messages is context-poisoning: one rule ends up restating or
+superseding another's decision. The grouped rationale, the relationships between a standard's
+slugs, and the escape-hatch mechanism live **once**, in the standard's detail file
+(`.agents/rules/<slug>.md`) — the single source of truth. If a message needs more than "what +
+fix + code", that belongs in the detail file, not the message.
+
 ## Where the pieces live (in a target repo)
 
 - **Always-on index:** a marker-delimited `## Engineering Standards` section in `AGENTS.md`
