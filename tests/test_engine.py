@@ -168,6 +168,41 @@ def test_standards_defers_and_skips_when_present(repo: Path):
     assert AGENTS_MARKER in body2
 
 
+def test_standards_logging_family_adds_details_and_snippet(repo: Path):
+    (repo / "app.py").write_text("x = 1\n")
+    plan = build_plan(repo, _facts(repo), Settings(), requested=["standards"])
+    disp = _standards_dispositions(plan)
+    adds = {t for t, d in disp.items() if d is Disposition.ADD}
+    assert ".agents/rules/log-get-logger.md" in adds
+    assert ".agents/rules/log-no-print.md" in adds
+    assert ".agents/rules/core-logger.md" in adds
+    assert "snippets/core/logger.py" in adds
+
+
+def test_astgrep_ships_logging_rules(repo: Path):
+    (repo / "app.py").write_text("x = 1\n")
+    plan = build_plan(repo, _facts(repo), Settings(), requested=["ast-grep"])
+    adds = {op.target for op in plan.by(Disposition.ADD) if op.component == "ast-grep"}
+    assert "ast-grep/rules/log-get-logger.yml" in adds
+    assert "ast-grep/rules/log-no-print.yml" in adds
+
+
+def test_logging_rules_embed_ces_codes_and_warn_severity():
+    for slug, code in (("log-get-logger", "CES-45"), ("log-no-print", "CES-46")):
+        body = template_text(f"ast-grep-rules/{slug}.yml")
+        assert f"{code} ({slug})" in body
+        assert f"id: {slug}" in body
+        assert "severity: warning" in body
+        assert "severity: info" not in body
+    # log-no-print exempts CLI entrypoints.
+    no_print = template_text("ast-grep-rules/log-no-print.yml")
+    assert "__main__" in no_print
+    # core-logger snippet drop-in is present and structlog-based.
+    snippet = template_text("snippets/core/logger.py")
+    assert "structlog" in snippet
+    assert "def get_logger" in snippet
+
+
 def test_ces_codes_embedded_in_as_built_rule_messages():
     for slug in (
         "no-dict-call-return",

@@ -28,14 +28,22 @@ AGENTS_MARKER = "## Repo Workspace Defaults"
 STANDARDS_MARKER = "## Engineering Standards"
 # Per-CES detail files under .agents/rules/ shipped by the standards component. One file per
 # standard (a CES may ship several ast-grep/prek slugs but documents them in one detail file).
-STANDARDS_RULE_DETAILS = ["no-dict", "file-size-guard"]
-# Canonical drop-in / comparison code shipped under snippets/.
-STANDARDS_SNIPPETS = ["no-dict-boundary.py"]
+STANDARDS_RULE_DETAILS = [
+    "no-dict",
+    "file-size-guard",
+    "log-get-logger",
+    "log-no-print",
+    "core-logger",
+]
+# Canonical drop-in / comparison code shipped under snippets/ (may be nested, e.g. core/logger.py).
+STANDARDS_SNIPPETS = ["no-dict-boundary.py", "core/logger.py"]
 ASTGREP_RULES = [
     "no-dict-call-return",
     "no-dict-literal-return",
     "no-dict-return-annotation",
     "no-dict-alias",
+    "log-get-logger",
+    "log-no-print",
 ]
 MATTPOCOCK_SKILLS = [
     "setup-matt-pocock-skills",

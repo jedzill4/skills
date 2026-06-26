@@ -123,6 +123,9 @@ project-excludes = [
   "**/.venv/**/*",
   "skills/**/*",
   "review/**/*",     # separate distribution with its own env/import-root
+  # Bundled template payload: snippets/ drop-ins are shipped verbatim into target
+  # repos and reference their deps (structlog, pydantic, …), not this tool's env.
+  "scaffolding/templates/**/*",
 ]
 use-ignore-files = false
 disable-project-excludes-heuristics = true

@@ -19,3 +19,12 @@ rules are reviewer/agent judgment. Full convention: `docs/engineering-standards.
 - **CES-71 · keep files small** `[prek]` — split a module before it grows; the
   `file-size-guard` hook warns at 400 lines and errors at 700. A persistently large file is a
   design smell, not a limit to raise. → `@.agents/rules/file-size-guard.md`
+- **CES-45 · use the house get_logger** `[ast-grep]` — never call `logging.getLogger` directly;
+  acquire loggers via `get_logger` from `core/logger.py`. Slug: `log-get-logger`. →
+  `@.agents/rules/log-get-logger.md`
+- **CES-46 · libraries log, they don't print** `[ast-grep]` — no `print()` in importable library
+  code; emit through `get_logger`. CLI/`__main__` entrypoints are exempt. Slug: `log-no-print`. →
+  `@.agents/rules/log-no-print.md`
+- **CES-74 · the house logger** `[snippet]` — `snippets/core/logger.py` is the canonical structlog
+  setup (JSON in prod, colored console in dev, level from `LOG_LEVEL`). Drop it in at
+  `<pkg>/core/logger.py`. Slug: `core-logger`. → `@.agents/rules/core-logger.md`
