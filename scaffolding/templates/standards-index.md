@@ -48,3 +48,6 @@ rules are reviewer/agent judgment. Full convention: `docs/engineering-standards.
 - **CES-32 · keep non-code out of the package** `[prek]` — no notebooks/`resources/`/`reports/`/`data/`
   inside the import package. Parametrized by a `{{ import_package }}` placeholder resolved at
   install time. Slug: `repo-shape`. → `@.agents/rules/repo-shape.md`
+- **CES-75 · Conventional Commits** `[prek]` — commit subjects follow `type(scope): description`;
+  a commit-msg hook checks every commit and a CI workflow checks the PR title. Slug:
+  `agents-conventional-commits`. → `@.agents/rules/agents-conventional-commits.md`

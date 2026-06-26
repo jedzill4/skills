@@ -339,6 +339,39 @@ def test_repo_hygiene_hooks_are_ces_coded():
     assert "{{ import_package }}" in prek
 
 
+def test_standards_conventional_commits_adds_detail(repo: Path):
+    (repo / "app.py").write_text("x = 1\n")
+    plan = build_plan(repo, _facts(repo), Settings(), requested=["standards"])
+    disp = _standards_dispositions(plan)
+    adds = {t for t, d in disp.items() if d is Disposition.ADD}
+    assert ".agents/rules/agents-conventional-commits.md" in adds
+
+
+def test_prek_plan_ships_commit_msg_hook(repo: Path):
+    plan = build_plan(repo, _facts(repo), Settings(), requested=["prek"])
+    prek_ops = [op for op in plan.by(Disposition.ADD) if op.target == "prek.toml"]
+    assert prek_ops, "expected a prek.toml ADD op"
+    content = prek_ops[0].content or ""
+    assert 'id = "agents-conventional-commits"' in content
+    assert 'stages = ["commit-msg"]' in content
+
+
+def test_ci_plan_ships_conventional_commits_workflow(repo: Path):
+    plan = build_plan(repo, _facts(repo), Settings(), requested=["ci"])
+    adds = {op.target for op in plan.by(Disposition.ADD) if op.component == "ci"}
+    assert ".github/workflows/conventional-commits.yml" in adds
+
+
+def test_conventional_commits_artifacts_are_ces_coded():
+    prek = template_text("prek-generic.toml")
+    assert "CES-75 (agents-conventional-commits)" in prek
+    assert 'id = "agents-conventional-commits"' in prek
+    wf = template_text("github/workflows/conventional-commits.yml")
+    assert "CES-75 (agents-conventional-commits)" in wf
+    # title read from env, never interpolated into the shell (injection-safe).
+    assert "PR_TITLE: ${{ github.event.pull_request.title }}" in wf
+
+
 def test_ces_codes_embedded_in_as_built_rule_messages():
     for slug in (
         "no-dict-call-return",

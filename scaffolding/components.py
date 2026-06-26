@@ -40,6 +40,7 @@ STANDARDS_RULE_DETAILS = [
     "arch-database-package",
     "no-utils",
     "repo-shape",
+    "agents-conventional-commits",
 ]
 # Canonical drop-in / comparison code shipped under snippets/ (may be nested, e.g. core/logger.py).
 STANDARDS_SNIPPETS = ["no-dict-boundary.py", "core/logger.py", "api-schemas.py", "settings.py"]
@@ -294,7 +295,17 @@ def plan_ci(ctx: Context) -> list[Op]:
             ",".join(DEFAULT_CI_PARTS),
         )
     )
-    ops: list[Op] = []
+    # CES-75: Conventional Commits PR check ships whenever CI is set up, independent of parts
+    # (it mirrors the always-on commit-msg prek hook).
+    ops: list[Op] = [
+        _write_if_absent(
+            "ci",
+            ctx.root / ".github/workflows/conventional-commits.yml",
+            template_text("github/workflows/conventional-commits.yml"),
+            ".github/workflows/conventional-commits.yml",
+            ctx.guide_url,
+        )
+    ]
     if "security" in parts:
         ops.append(
             _write_if_absent(
