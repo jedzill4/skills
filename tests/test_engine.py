@@ -230,6 +230,35 @@ def test_api_schemas_rule_is_ces_coded_and_placement_scoped():
     assert "**/api/**/schemas/responses/**/*.py" in body
 
 
+def test_standards_settings_module_rule_adds_detail_and_snippet(repo: Path):
+    (repo / "app.py").write_text("x = 1\n")
+    plan = build_plan(repo, _facts(repo), Settings(), requested=["standards"])
+    disp = _standards_dispositions(plan)
+    adds = {t for t, d in disp.items() if d is Disposition.ADD}
+    assert ".agents/rules/settings-module.md" in adds
+    assert "snippets/settings.py" in adds
+
+
+def test_astgrep_ships_settings_module_rule(repo: Path):
+    (repo / "app.py").write_text("x = 1\n")
+    plan = build_plan(repo, _facts(repo), Settings(), requested=["ast-grep"])
+    adds = {op.target for op in plan.by(Disposition.ADD) if op.component == "ast-grep"}
+    assert "ast-grep/rules/settings-module.yml" in adds
+
+
+def test_settings_module_rule_is_ces_coded_and_exempts_settings():
+    body = template_text("ast-grep-rules/settings-module.yml")
+    assert "CES-76 (settings-module)" in body
+    assert "id: settings-module" in body
+    assert "severity: warning" in body
+    assert "severity: info" not in body
+    # the settings module itself is exempt so it can read env.
+    assert "**/settings.py" in body
+    snippet = template_text("snippets/settings.py")
+    assert "BaseSettings" in snippet
+    assert "def get_settings" in snippet
+
+
 def test_ces_codes_embedded_in_as_built_rule_messages():
     for slug in (
         "no-dict-call-return",

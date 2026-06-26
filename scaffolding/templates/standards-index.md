@@ -32,3 +32,6 @@ rules are reviewer/agent judgment. Full convention: `docs/engineering-standards.
   `api/**/schemas/{requests,responses}` must set `model_config = ConfigDict(extra="forbid")`.
   Placement-scoped: inert for internal/domain models and non-API repos. Slug:
   `api-schemas-extra-forbid`. → `@.agents/rules/api-schemas-extra-forbid.md`
+- **CES-76 · config in a settings module** `[ast-grep]` — read env/flags only in the
+  `BaseSettings` settings module (case-insensitive, via `get_settings()`); `os.getenv`/`os.environ`
+  anywhere else is flagged. Slug: `settings-module`. → `@.agents/rules/settings-module.md`
