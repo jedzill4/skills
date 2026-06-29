@@ -8,12 +8,13 @@ from pathlib import Path
 from cyclopts import App
 
 from scaffolding import console, prompts
+from scaffolding.agent_config import AGENT_CHOICES
 from scaffolding.checks import run_checks
-from scaffolding.components import AGENT_CHOICES, ALL_CI_PARTS, DEFAULT_CI_PARTS, REGISTRY
+from scaffolding.components import ALL_CI_PARTS, DEFAULT_CI_PARTS, REGISTRY
 from scaffolding.doctor import probe_tools, repo_state
 from scaffolding.engine import UnknownComponent, build_plan
 from scaffolding.facts import Facts, detect
-from scaffolding.plan import Decisions, Plan
+from scaffolding.plan import Agent, Decisions, Plan
 from scaffolding.settings import Settings
 
 app = App(
@@ -24,12 +25,12 @@ app = App(
 
 
 # --- shared helpers ----------------------------------------------------------
-def _settings(yes: bool, agent: str | None, ci: bool | None, no_deps: bool) -> Settings:
+def _settings(yes: bool, agent: list[Agent] | None, ci: bool | None, no_deps: bool) -> Settings:
     s = Settings()
     if yes:
         s.assume_yes = True
     if agent:
-        s.agent = agent
+        s.agent = ",".join(a.value for a in agent)
     if ci is True:
         s.with_ci = True
     elif ci is False:
@@ -44,9 +45,14 @@ def _split(s: str | None) -> list[str]:
 
 
 def _seed_decisions(
-    name: str | None, description: str | None, varlock: bool | None, ci_parts: str | None
+    agent: list[Agent] | None,
+    name: str | None,
+    description: str | None,
+    varlock: bool | None,
+    ci_parts: str | None,
 ) -> Decisions:
     return Decisions(
+        agents=list(dict.fromkeys(agent)) or None if agent else None,
         pyproject_name=name,
         pyproject_description=description,
         varlock=varlock,
@@ -59,8 +65,11 @@ def _resolve_decisions(plan: Plan, settings: Settings, decisions: Decisions) -> 
     for dec in plan.decisions:
         if getattr(decisions, dec.key) is not None:
             continue
-        if dec.key == "agent":
-            value = prompts.select(dec.question, AGENT_CHOICES, dec.default, assume_yes=ay)
+        if dec.key == "agents":
+            picked = prompts.checkbox(
+                dec.question, AGENT_CHOICES, dec.default.split(","), assume_yes=ay
+            )
+            value = [Agent(a) for a in picked]
         elif dec.key in ("pyproject_name", "pyproject_description"):
             value = prompts.text(dec.question, dec.default, assume_yes=ay)
         elif dec.key == "ci_parts":
@@ -90,7 +99,7 @@ def install(
     skip: str | None = None,
     yes: bool = False,
     dry_run: bool = False,
-    agent: str | None = None,
+    agent: list[Agent] | None = None,
     ci: bool | None = None,
     ci_parts: str | None = None,
     name: str | None = None,
@@ -118,7 +127,7 @@ def install(
     ):
         settings.with_ci = True
 
-    decisions = _seed_decisions(name, description, varlock, ci_parts)
+    decisions = _seed_decisions(agent, name, description, varlock, ci_parts)
 
     try:
         plan = build_plan(
@@ -168,7 +177,7 @@ def plan_cmd(
     *,
     skip: str | None = None,
     json: bool = False,
-    agent: str | None = None,
+    agent: list[Agent] | None = None,
     ci: bool | None = None,
     no_deps: bool = False,
     ci_parts: str | None = None,
@@ -180,7 +189,7 @@ def plan_cmd(
     root = Path.cwd()
     settings = _settings(False, agent, ci, no_deps)
     facts = detect(root)
-    decisions = _seed_decisions(name, description, varlock, ci_parts)
+    decisions = _seed_decisions(agent, name, description, varlock, ci_parts)
     try:
         plan = build_plan(
             root,

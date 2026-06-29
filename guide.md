@@ -31,11 +31,12 @@ those are yours to merge, per this guide.
    files you'll merge by hand.
 2. **Surface decisions to the user.** For each entry in `decisions_needed`, ask
    the user — do not pick for them (see the taxonomy below). Typical keys:
-   `agent`, `pyproject_name`, `pyproject_description`, `ci_parts`, `varlock`.
+   `agents`, `pyproject_name`, `pyproject_description`, `ci_parts`, `varlock`.
 3. **Apply clean-adds.** Run
    `scaffolding install --yes <answers as flags>` (e.g. `--agent opencode
-   --name foo --ci --ci-parts tests,security`). `--yes` keeps it
-   non-interactive; your gathered answers come in as flags.
+   --agent claude-code --name foo --ci --ci-parts tests,security`). `--yes` keeps
+   it non-interactive; your gathered answers come in as flags. `--agent` is
+   repeatable / comma-separated — pass every agent the user targets.
 4. **Handle merges yourself.** For every `defer`, additively merge per the
    per-area rules below. This is the part that needs judgment — the CLI won't do
    it.
@@ -85,8 +86,9 @@ into three buckets:
 - **Tier 1 — Clean-adds** (the CLI applies): gitignore lines, `opencode.jsonc`,
   prek hooks, ast-grep config, the `AGENTS.md` section when absent.
 - **Tier 2 — Policy** (the USER decides, even on agentic install): CI opt-in and
-  which parts; agent target (`opencode`/`claude-code`/`codex`); `pyproject` name
-  and description; skill set. Surface these from `decisions_needed`.
+  which parts; agent target(s) — any of `opencode`/`claude-code`/`codex`, one or
+  more; `pyproject` name and description; skill set. Surface these from
+  `decisions_needed`.
 - **Tier 3 — Destructive** (USER, explicit confirm; default skip): `varlock init`
   when `.env.example`/`.env.schema` exists; `docker.yml` on a private/internal
   repo (GHCR billing). The CLI skips these with a notice unless told otherwise.
@@ -154,15 +156,46 @@ pinned, `actions/checkout@v4`, a `concurrency` group, least-privilege
 Never overwrite an existing workflow; if a target exists, leave it and suggest
 additive changes the user approves. Bump stale pinned action/tool versions.
 
-### `opencode.jsonc`
+### Per-agent config
 
-Repo-local config at the **repo root** from
-[opencode-template.jsonc](https://raw.githubusercontent.com/jedzill4/scaffolding/main/scaffolding/templates/opencode-template.jsonc).
-Merge additively: add only missing keys, plugin entries, and permission rules;
-preserve the user's existing values. It sets the `$schema`, the
-`opencode-sessions-explorer` and `opencode-varlock@latest` plugins, and
-`permission` rules denying secret access (`.env*`, `*.pem`, `*.key`,
-`*credentials*`, `varlock.config`).
+The `agent-config` component writes config for each selected agent. `AGENTS.md`
+(see below) is the shared brain read by **opencode** and **codex**; **claude-code**
+is the exception — it reads `CLAUDE.md` + `.claude/skills`, so it is bridged with
+symlinks.
+
+- **opencode** → repo-root `opencode.jsonc` from
+  [opencode-template.jsonc](https://raw.githubusercontent.com/jedzill4/scaffolding/main/scaffolding/templates/opencode-template.jsonc).
+  Merge additively: add only missing keys, plugin entries, and permission rules;
+  preserve the user's values. Sets `$schema`, the `opencode-sessions-explorer` and
+  `opencode-varlock@latest` plugins, and `permission` rules denying secret access
+  (`.env*`, `*.pem`, `*.key`, `*credentials*`, `varlock.config`).
+- **claude-code** → `.claude/settings.json` from
+  [claude-settings-template.json](https://raw.githubusercontent.com/jedzill4/scaffolding/main/scaffolding/templates/claude-settings-template.json)
+  (a `permissions.deny`/`allow` mirror of the opencode secret rules), plus two
+  clean-adds-only symlinks: `CLAUDE.md` → `AGENTS.md` and `.claude/skills` →
+  `.agents/skills`. If either path already exists it is deferred — bridge by hand
+  (never clobber). Merge `.claude/settings.json` additively into any existing file.
+- **codex** → no repo-local file. Codex reads `AGENTS.md` natively and has no
+  per-file deny-list; protection is varlock + AGENTS.md guidance + the leak-scan
+  hook, plus user-level `~/.codex/config.toml` (`sandbox_mode="workspace-write"`,
+  `approval_policy="on-request"`). See *Secret protection per agent* below.
+
+### Secret protection per agent
+
+`varlock init` is agent-agnostic (it only creates `.env.schema` and gitignores
+`.env*`). The live context-redaction plugin (`opencode-varlock`) is **OpenCode-only**.
+
+| Layer | opencode | claude-code | codex |
+|---|---|---|---|
+| `.env.schema` committed, `.env*` gitignored | ✅ | ✅ | ✅ |
+| Repo-local read/bash deny-list | `opencode.jsonc` | `.claude/settings.json` | — (none) |
+| Live context redaction plugin | `opencode-varlock` | — | — |
+| AGENTS.md / varlock-skill guidance | ✅ | ✅ (via CLAUDE.md) | ✅ |
+| Leak pre-commit hook (prek) | ✅ | ✅ | ✅ |
+
+For codex, tell the user: never `cat .env` (use `varlock load`), rely on the
+AGENTS.md rules + leak-scan hook, and harden `~/.codex/config.toml`
+(`sandbox_mode`, `approval_policy`) — there is no live-redaction equivalent.
 
 ### Varlock secret management
 
@@ -182,8 +215,11 @@ everything else. Do not edit `CLAUDE.md` during bootstrap unless asked.
 
 ## Skill installation
 
-Default agent is OpenCode. Install the curated upstream skills, then this repo's
-recurring local skills (`journalist`, `handoff`):
+Skills install **once** into the shared `.agents/skills` standard (read by
+opencode + codex). When `claude-code` is selected, the `agent-config` component's
+`.claude/skills` → `.agents/skills` symlink makes the same skills visible to
+Claude — do **not** re-run the installer per agent. Install the curated upstream
+skills, then this repo's recurring local skills (`journalist`, `handoff`):
 
 ```bash
 npx skills add mattpocock/skills --agent opencode --yes --skill setup-matt-pocock-skills diagnose grill-with-docs triage improve-codebase-architecture tdd to-issues to-prd zoom-out prototype grill-me write-a-skill
@@ -193,7 +229,6 @@ npx skills add dmno-dev/varlock --agent opencode --yes
 
 From a local checkout, install local skills with
 `npx skills add . --agent opencode --yes --skill journalist handoff --full-depth`.
-Ask before switching `--agent` to `claude-code` or `codex`.
 
 After installing, run the `setup-matt-pocock-skills` skill once to configure the
 repo (issue tracker, triage labels, domain docs) that the other engineering
@@ -205,9 +240,11 @@ tracker when the user explicitly wants it.
 ## Verify
 
 Run `scaffolding check` — it asserts the completeness checklist (gitignore
-entries incl. `!.env.schema`; prek `betterleaks` hook; valid `opencode.jsonc`
-with schema/plugin/permission; `.env.schema` tracked and `.env` ignored; ast-grep
-config when the hook is present; the `AGENTS.md` section). Then confirm any
+entries incl. `!.env.schema`; prek `betterleaks` hook; `.env.schema` tracked and
+`.env` ignored; ast-grep config when the hook is present; the `AGENTS.md` section,
+which is the only universal requirement). Agent config is validated **only when
+present**: `opencode.jsonc` (schema/plugin/permission), `.claude/settings.json`
+(secret `permissions.deny`), and `CLAUDE.md` → `AGENTS.md`. Then confirm any
 deferred merges you applied by hand preserved all existing content, and that no
 existing file, key, array item, or comment was removed without explicit user
 approval.

@@ -12,7 +12,13 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from scaffolding.plan import Decision, Decisions, Disposition, Op
+from scaffolding.agent_config import (
+    AGENTS_SKILLS_DIR,
+    plan_agent_config,
+    register_agents_decision,
+)
+from scaffolding.ops import write_if_absent
+from scaffolding.plan import Agent, Decision, Decisions, Disposition, Op
 from scaffolding.templates_registry import template_text
 
 if TYPE_CHECKING:
@@ -89,7 +95,6 @@ DEFAULT_CI_PARTS = ["tests", "security", "docker"]
 # "opencode" is opt-in only (off by default): it needs repo secrets and the
 # OpenCode GitHub App installed, so it is never added unless explicitly chosen.
 ALL_CI_PARTS = ["tests", "security", "docker", "publish", "opencode"]
-AGENT_CHOICES = ["opencode", "claude-code", "codex"]
 
 
 @dataclass
@@ -143,18 +148,6 @@ def infer_project_name(root: Path) -> str:
     return _norm_name(root.name)
 
 
-def _write_if_absent(component: str, dest: Path, content: str, label: str, guide_url: str) -> Op:
-    if dest.exists():
-        return Op(
-            component,
-            "noop",
-            label,
-            Disposition.DEFER,
-            detail=f"already exists — left untouched. Merge via guide: {guide_url}",
-        )
-    return Op(component, "write", label, Disposition.ADD, path=str(dest), content=content)
-
-
 # --- gates -------------------------------------------------------------------
 def _always(_f: Facts) -> bool:
     return True
@@ -199,19 +192,6 @@ def plan_gitignore(ctx: Context) -> list[Op]:
     ]
 
 
-def plan_opencode(ctx: Context) -> list[Op]:
-    dest = ctx.root / "opencode.jsonc"
-    return [
-        _write_if_absent(
-            "opencode",
-            dest,
-            template_text("opencode-template.jsonc"),
-            "opencode.jsonc",
-            ctx.guide_url,
-        )
-    ]
-
-
 def plan_prek(ctx: Context) -> list[Op]:
     dest = ctx.root / "prek.toml"
     if dest.exists():
@@ -244,7 +224,7 @@ def plan_prek(ctx: Context) -> list[Op]:
 
 def plan_astgrep(ctx: Context) -> list[Op]:
     ops = [
-        _write_if_absent(
+        write_if_absent(
             "ast-grep",
             ctx.root / "sgconfig.yml",
             template_text("sgconfig-template.yml"),
@@ -255,7 +235,7 @@ def plan_astgrep(ctx: Context) -> list[Op]:
     for rule in ASTGREP_RULES:
         dest = ctx.root / "ast-grep" / "rules" / f"{rule}.yml"
         ops.append(
-            _write_if_absent(
+            write_if_absent(
                 "ast-grep",
                 dest,
                 template_text(f"ast-grep-rules/{rule}.yml"),
@@ -313,7 +293,7 @@ def plan_ci(ctx: Context) -> list[Op]:
     # CES-75: Conventional Commits PR check ships whenever CI is set up, independent of parts
     # (it mirrors the always-on commit-msg prek hook).
     ops: list[Op] = [
-        _write_if_absent(
+        write_if_absent(
             "ci",
             ctx.root / ".github/workflows/conventional-commits.yml",
             template_text("github/workflows/conventional-commits.yml"),
@@ -323,7 +303,7 @@ def plan_ci(ctx: Context) -> list[Op]:
     ]
     if "security" in parts:
         ops.append(
-            _write_if_absent(
+            write_if_absent(
                 "ci",
                 ctx.root / ".github/workflows/zizmor.yml",
                 template_text("github/workflows/zizmor.yml"),
@@ -332,7 +312,7 @@ def plan_ci(ctx: Context) -> list[Op]:
             )
         )
         ops.append(
-            _write_if_absent(
+            write_if_absent(
                 "ci",
                 ctx.root / ".github/zizmor.yml",
                 template_text("github/zizmor.yml"),
@@ -342,7 +322,7 @@ def plan_ci(ctx: Context) -> list[Op]:
         )
     if "tests" in parts and ctx.facts.is_python:
         ops.append(
-            _write_if_absent(
+            write_if_absent(
                 "ci",
                 ctx.root / ".github/workflows/tests.yml",
                 template_text("github/workflows/tests.yml"),
@@ -351,7 +331,7 @@ def plan_ci(ctx: Context) -> list[Op]:
             )
         )
         ops.append(
-            _write_if_absent(
+            write_if_absent(
                 "ci",
                 ctx.root / ".github/workflows/pip-audit.yml",
                 template_text("github/workflows/pip-audit.yml"),
@@ -360,7 +340,7 @@ def plan_ci(ctx: Context) -> list[Op]:
             )
         )
         ops.append(
-            _write_if_absent(
+            write_if_absent(
                 "ci",
                 ctx.root / ".github/dependabot.yml",
                 template_text("github/dependabot.yml"),
@@ -382,7 +362,7 @@ def plan_ci(ctx: Context) -> list[Op]:
             )
         else:
             ops.append(
-                _write_if_absent(
+                write_if_absent(
                     "ci",
                     ctx.root / ".github/workflows/docker.yml",
                     template_text("github/workflows/docker.yml"),
@@ -392,7 +372,7 @@ def plan_ci(ctx: Context) -> list[Op]:
             )
     if "publish" in parts:
         ops += [
-            _write_if_absent(
+            write_if_absent(
                 "ci",
                 ctx.root / f".github/workflows/{wf}",
                 template_text(f"github/workflows/{wf}"),
@@ -403,7 +383,7 @@ def plan_ci(ctx: Context) -> list[Op]:
         ]
     if "opencode" in parts:
         ops += [
-            _write_if_absent(
+            write_if_absent(
                 "ci",
                 ctx.root / f".github/workflows/{wf}",
                 template_text(f"github/workflows/{wf}"),
@@ -483,7 +463,7 @@ def _standards_index_op(ctx: Context) -> Op:
 def plan_standards(ctx: Context) -> list[Op]:
     ops = [_standards_index_op(ctx)]
     ops += [
-        _write_if_absent(
+        write_if_absent(
             "standards",
             ctx.root / ".agents" / "rules" / f"{slug}.md",
             template_text(f"agents-rules/{slug}.md"),
@@ -493,7 +473,7 @@ def plan_standards(ctx: Context) -> list[Op]:
         for slug in STANDARDS_RULE_DETAILS
     ]
     ops += [
-        _write_if_absent(
+        write_if_absent(
             "standards",
             ctx.root / ".agents" / "snippets" / snippet,
             template_text(f"snippets/{snippet}"),
@@ -510,10 +490,11 @@ def plan_skills(ctx: Context) -> list[Op]:
         return [Op("skills", "noop", "skills", Disposition.SKIP, detail="SKIP_SKILLS set")]
     if not ctx.facts.has_npx:
         return [Op("skills", "noop", "skills", Disposition.SKIP, detail="npx not found")]
-    agent = ctx.decisions.agent or ctx.settings.agent
-    ctx.add_decision(
-        Decision(2, "agent", "Which agent target? (opencode/claude-code/codex)", agent)
-    )
+    register_agents_decision(ctx)
+    # Install ONCE into the shared .agents/skills standard (read by opencode + codex).
+    # Claude reaches the same skills via the .claude/skills -> .agents/skills symlink that
+    # the agent-config component creates when claude-code is selected.
+    install_agent = Agent.OPENCODE.value
     cmds = [
         [
             "npx",
@@ -521,7 +502,7 @@ def plan_skills(ctx: Context) -> list[Op]:
             "add",
             "mattpocock/skills",
             "--agent",
-            agent,
+            install_agent,
             "--yes",
             "--skill",
             *MATTPOCOCK_SKILLS,
@@ -532,18 +513,18 @@ def plan_skills(ctx: Context) -> list[Op]:
             "add",
             "jedzill4/scaffolding",
             "--agent",
-            agent,
+            install_agent,
             "--yes",
             "--skill",
             "journalist",
             "handoff",
         ],
-        ["npx", "skills", "add", "dmno-dev/varlock", "--agent", agent, "--yes"],
+        ["npx", "skills", "add", "dmno-dev/varlock", "--agent", install_agent, "--yes"],
     ]
     labels = [
-        f"matt pocock skills (agent: {agent})",
-        f"local skills: journalist handoff (agent: {agent})",
-        f"dmno-dev/varlock skill (agent: {agent})",
+        f"matt pocock skills ({AGENTS_SKILLS_DIR})",
+        f"local skills: journalist handoff ({AGENTS_SKILLS_DIR})",
+        f"dmno-dev/varlock skill ({AGENTS_SKILLS_DIR})",
     ]
     return [
         Op("skills", "run", labels[i], Disposition.RUN, cmd=cmds[i], optional=True)
@@ -586,13 +567,32 @@ def plan_varlock(ctx: Context) -> list[Op]:
         cmd = ["npx", "varlock", "init", "--agent"]
     else:
         return [Op("varlock", "noop", "varlock", Disposition.SKIP, detail="varlock/npx not found")]
-    return [Op("varlock", "run", "varlock init", Disposition.RUN, cmd=cmd, optional=True)]
+    return [
+        Op(
+            "varlock",
+            "run",
+            "varlock init",
+            Disposition.RUN,
+            cmd=cmd,
+            optional=True,
+            detail="agent-agnostic; runtime redaction (opencode-varlock) is opencode-only — "
+            "claude/codex rely on the deny-list/guidance",
+        )
+    ]
 
 
 # --- registry ----------------------------------------------------------------
 REGISTRY: list[Component] = [
     Component("gitignore", "Workspace .gitignore entries", 1, True, _always, plan_gitignore),
-    Component("opencode", "Repo-local opencode.jsonc", 1, True, _always, plan_opencode),
+    Component(
+        "agent-config",
+        "Per-agent config (opencode.jsonc / .claude + CLAUDE.md / codex notice)",
+        1,
+        True,
+        _always,
+        plan_agent_config,
+        deps=lambda f: ["agents"],
+    ),
     Component(
         "prek",
         "prek.toml hooks (generic + python)",

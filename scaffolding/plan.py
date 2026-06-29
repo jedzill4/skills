@@ -18,12 +18,24 @@ class Disposition(StrEnum):
     WARN = "warn"
 
 
+class Agent(StrEnum):
+    """Supported agent targets.
+
+    opencode + codex follow the .agents/AGENTS.md standard; claude-code diverges
+    (.claude/ + CLAUDE.md) and is bridged by symlink.
+    """
+
+    OPENCODE = "opencode"
+    CLAUDE_CODE = "claude-code"
+    CODEX = "codex"
+
+
 @dataclass
 class Op:
     """One planned operation. Plan computes everything; apply just executes."""
 
     component: str
-    kind: str  # write | append | run | noop
+    kind: str  # write | append | symlink | run | noop
     target: str
     disposition: Disposition
     detail: str = ""
@@ -46,7 +58,7 @@ class Decision:
 class Decisions(BaseModel):
     """User answers to Tier-2/3 decisions; field names match ``Decision.key``."""
 
-    agent: str | None = None
+    agents: list[Agent] | None = None
     pyproject_name: str | None = None
     pyproject_description: str | None = None
     ci_parts: list[str] | None = None

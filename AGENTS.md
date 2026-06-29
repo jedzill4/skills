@@ -15,6 +15,12 @@
   handles merges). Keep template raw URLs pointing at `jedzill4/scaffolding`.
 - `skills/` — actual installed skills (`journalist`, `handoff`).
 
+Agent targets are multi-valued (`--agent`, repeatable: `opencode`/`claude-code`/
+`codex`). The `agent-config` component writes per-agent config — `opencode.jsonc`
+(opencode), `.claude/settings.json` + `CLAUDE.md`→`AGENTS.md` + `.claude/skills`→
+`.agents/skills` symlinks (claude-code), and a codex secret-protection notice.
+`AGENTS.md` is the shared brain; skills install once into `.agents/skills`.
+
 After changing the CLI, validate with `uv run ruff check scaffolding` and
 `uv run scaffolding --help`.
 

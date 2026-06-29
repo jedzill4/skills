@@ -129,11 +129,23 @@ def _apply_append(op: Op) -> None:
     p.write_text(cur + (op.content or ""), encoding="utf-8")
 
 
+def _apply_symlink(op: Op) -> None:
+    if op.path is None or op.content is None:
+        raise ValueError(f"symlink op for {op.target} needs path and content")
+    link = Path(op.path)
+    link.parent.mkdir(parents=True, exist_ok=True)
+    if link.exists() or link.is_symlink():
+        return  # clean-adds-only: never replace an existing path
+    link.symlink_to(op.content)
+
+
 def _apply_add(op: Op) -> None:
     if op.kind == "write":
         _apply_write(op)
     elif op.kind == "append":
         _apply_append(op)
+    elif op.kind == "symlink":
+        _apply_symlink(op)
 
 
 def _apply_run(op: Op) -> bool:

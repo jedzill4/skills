@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/jedzill4/scaffolding/releases"><img alt="Release" src="https://img.shields.io/github/v/release/jedzill4/scaffolding?logo=github" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white" alt="Python 3.11+"></a>
-  <a href="https://opencode.ai/"><img src="https://img.shields.io/badge/Agent-OpenCode--first-1d1d1d?logo=anthropic&logoColor=white" alt="OpenCode-first"></a>
+  <a href="https://opencode.ai/"><img src="https://img.shields.io/badge/Agents-opencode%20%C2%B7%20claude--code%20%C2%B7%20codex-1d1d1d?logo=anthropic&logoColor=white" alt="opencode · claude-code · codex"></a>
   <a href="https://docs.astral.sh/uv/"><img src="https://img.shields.io/badge/Install-uvx%20%C2%B7%20curl-261230?logo=astral&logoColor=white" alt="Install via uvx or curl" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
@@ -20,14 +20,15 @@
 
 ---
 
-Personal repo bootstrap + agent skills for OpenCode-first development.
+Personal repo bootstrap + agent skills for opencode / claude-code / codex.
 
 This repo does two things:
 
-1. **Bootstrap a repo** with my workspace defaults (gitignore, local OpenCode
-   config, `AGENTS.md` guidance, optional prek hooks, ast-grep, CI, Varlock
-   secrets) via a small Python CLI. This is a one-time-per-repo operation, run as
-   an *agentic install* or directly — not an installed skill.
+1. **Bootstrap a repo** with my workspace defaults (gitignore, per-agent config,
+   `AGENTS.md` guidance, optional prek hooks, ast-grep, CI, Varlock secrets) via a
+   small Python CLI. This is a one-time-per-repo operation, run as an *agentic
+   install* or directly — not an installed skill. Target one or more agents with
+   `--agent` (repeatable / comma-separated; default `opencode`).
 2. **Ship a couple of recurring skills** (`journalist`, `handoff`) that you
    install once and use repeatedly.
 
@@ -79,9 +80,10 @@ scaffolding check                   # verify bootstrap completeness (nonzero exi
 scaffolding doctor                  # diagnose environment + tools
 ```
 
-Components: `gitignore opencode prek ast-grep pyproject ci agents skills
-varlock` (all default-on except `ci`, which is opt-in). Scope with positional
-names or `--skip a,b`. Useful flags: `--agent`, `--ci/--no-ci`, `--ci-parts`,
+Components: `gitignore agent-config prek ast-grep pyproject ci agents standards
+skills varlock` (all default-on except `ci`, which is opt-in). Scope with
+positional names or `--skip a,b`. Useful flags: `--agent` (repeatable:
+`opencode`/`claude-code`/`codex`), `--ci/--no-ci`, `--ci-parts`,
 `--name`, `--description`, `--varlock/--no-varlock`, `--no-deps`. Legacy env vars
 (`AGENT`, `SKIP_SKILLS`, `SKIP_VARLOCK`, `WITH_CI`/`SKIP_CI`, `ASSUME_YES`) are
 honored.
@@ -91,8 +93,9 @@ There is no `uninstall`: the installer requires a git repo, so `git status` /
 
 ## Installed skills
 
-These are real skills you install once per agent and use repeatedly. Default
-agent target is OpenCode.
+These are real skills you install once and use repeatedly. They land in the
+shared `.agents/skills` standard (read by opencode + codex); selecting
+`claude-code` bridges them via the `.claude/skills` → `.agents/skills` symlink.
 
 Install selected upstream skills from Matt Pocock:
 
@@ -112,8 +115,9 @@ If installing from a checkout, run from this repo:
 npx skills add . --agent opencode --yes --skill journalist handoff --full-depth
 ```
 
-Use `--agent claude-code` or `--agent codex` instead only when that is the agent
-you actually use.
+Skills install once into `.agents/skills`; claude-code reaches them via the
+`.claude/skills` symlink created by the bootstrap, so there is no need to re-run
+the installer with `--agent claude-code` / `--agent codex`.
 
 ## Upstream skills from Matt Pocock
 
@@ -127,8 +131,8 @@ you actually use.
 
 - `scaffolding/` — the bootstrap CLI (Cyclopts + Questionary + pydantic-settings
   + Rich). `cli.py`, `engine.py`/`plan.py`, `components.py`, and `templates/`
-  (OpenCode config, prek hooks, pyproject, ast-grep rules, CI workflows,
-  AGENTS.md section).
+  (per-agent config — opencode.jsonc / .claude settings, prek hooks, pyproject,
+  ast-grep rules, CI workflows, AGENTS.md section).
 - `install.sh` — thin bootstrap shim (ensure `uv`, then run the CLI from git).
 - `guide.md` — the agentic-install guide (judgment layer).
 - `skills/productivity/journalist` — local daily session journals under `.journals/`.

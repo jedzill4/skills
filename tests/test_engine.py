@@ -7,10 +7,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from scaffolding.checks import run_checks
 from scaffolding.components import AGENTS_MARKER, STANDARDS_MARKER
 from scaffolding.engine import UnknownComponent, apply, build_plan, select_components
 from scaffolding.facts import detect
-from scaffolding.plan import Decisions, Disposition
+from scaffolding.plan import Agent, Decisions, Disposition
 from scaffolding.settings import Settings
 from scaffolding.templates_registry import template_text
 
@@ -455,7 +456,73 @@ def test_ces_codes_embedded_in_as_built_rule_messages():
 
 
 def test_select_skip(repo: Path):
-    comps, _ = select_components([], ["opencode"], _facts(repo), Settings(skip_skills=True))
+    comps, _ = select_components([], ["agent-config"], _facts(repo), Settings(skip_skills=True))
     names = {c.name for c in comps}
-    assert "opencode" not in names
+    assert "agent-config" not in names
     assert "gitignore" in names
+
+
+# --- multi-agent config ------------------------------------------------------
+def _no_skills(**kw) -> Settings:
+    return Settings(skip_skills=True, skip_varlock=True, **kw)
+
+
+def test_default_agent_still_writes_opencode_jsonc(repo: Path):
+    plan = build_plan(repo, _facts(repo), _no_skills())
+    assert "opencode.jsonc" in _targets(plan, Disposition.ADD)
+
+
+def test_claude_agent_writes_settings_and_symlinks_not_opencode(repo: Path):
+    decisions = Decisions(agents=[Agent.CLAUDE_CODE])
+    plan = build_plan(repo, _facts(repo), _no_skills(), decisions=decisions)
+    adds = _targets(plan, Disposition.ADD)
+    assert ".claude/settings.json" in adds
+    assert "CLAUDE.md" in adds
+    assert ".claude/skills" in adds
+    assert "opencode.jsonc" not in adds
+
+
+def test_claude_symlinks_apply_and_defer_on_rerun(repo: Path):
+    decisions = Decisions(agents=[Agent.CLAUDE_CODE])
+    settings = _no_skills()
+    apply(build_plan(repo, _facts(repo), settings, decisions=decisions), repo)
+    claude_md = repo / "CLAUDE.md"
+    assert claude_md.is_symlink()
+    assert claude_md.readlink().name == "AGENTS.md"
+    assert (repo / ".claude" / "skills").is_symlink()
+    assert claude_md.resolve() == (repo / "AGENTS.md").resolve()
+
+    plan2 = build_plan(repo, _facts(repo), settings, decisions=decisions)
+    defers = _targets(plan2, Disposition.DEFER)
+    assert "CLAUDE.md" in defers
+    assert ".claude/skills" in defers
+
+
+def test_multi_agent_opencode_and_codex(repo: Path):
+    decisions = Decisions(agents=[Agent.OPENCODE, Agent.CODEX])
+    plan = build_plan(repo, _facts(repo), _no_skills(), decisions=decisions)
+    assert "opencode.jsonc" in _targets(plan, Disposition.ADD)
+    codex_notice = [
+        op for op in plan.ops if op.component == "agent-config" and "codex" in op.target
+    ]
+    assert len(codex_notice) == 1
+    assert codex_notice[0].disposition is Disposition.SKIP
+
+
+def test_check_passes_for_claude_only_repo(repo: Path):
+    decisions = Decisions(agents=[Agent.CLAUDE_CODE])
+    apply(build_plan(repo, _facts(repo), _no_skills(), decisions=decisions), repo)
+    names = {r.name: r for r in run_checks(repo)}
+    assert "opencode.jsonc valid" not in names  # not required when absent
+    assert names[".claude/settings.json valid"].ok
+    assert names["CLAUDE.md -> AGENTS.md"].ok
+    assert names["AGENTS.md section"].ok
+
+
+def test_check_passes_for_codex_only_repo(repo: Path):
+    decisions = Decisions(agents=[Agent.CODEX])
+    apply(build_plan(repo, _facts(repo), _no_skills(), decisions=decisions), repo)
+    names = {r.name: r for r in run_checks(repo)}
+    assert "opencode.jsonc valid" not in names
+    assert "CLAUDE.md -> AGENTS.md" not in names
+    assert names["AGENTS.md section"].ok

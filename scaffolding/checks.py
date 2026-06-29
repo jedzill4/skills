@@ -55,6 +55,57 @@ def _gitignored(root: Path, rel: str) -> bool:
         return False
 
 
+def _check_opencode(root: Path) -> list[CheckResult]:
+    oc = root / "opencode.jsonc"
+    if not oc.exists():
+        return []
+    try:
+        data = json.loads(_strip_jsonc(oc.read_text(encoding="utf-8")))
+        need = [k for k in ("$schema", "plugin", "permission") if k not in data]
+        ok = not need
+        detail = "ok" if ok else f"missing keys: {', '.join(need)}"
+        return [CheckResult("opencode.jsonc valid", ok, detail)]
+    except (ValueError, OSError) as exc:
+        return [CheckResult("opencode.jsonc valid", False, f"parse error: {exc}")]
+
+
+def _check_claude(root: Path) -> list[CheckResult]:
+    out: list[CheckResult] = []
+    settings = root / ".claude" / "settings.json"
+    if settings.exists():
+        try:
+            data = json.loads(settings.read_text(encoding="utf-8"))
+            deny = data.get("permissions", {}).get("deny", [])
+            ok = any(".env" in str(rule) for rule in deny)
+            out.append(
+                CheckResult(
+                    ".claude/settings.json valid",
+                    ok,
+                    "ok" if ok else "permissions.deny missing .env rules",
+                )
+            )
+        except (ValueError, OSError) as exc:
+            out.append(CheckResult(".claude/settings.json valid", False, f"parse error: {exc}"))
+
+    claude_md = root / "CLAUDE.md"
+    if claude_md.is_symlink() or claude_md.exists():
+        bridged = (claude_md.is_symlink() and "AGENTS.md" in str(claude_md.readlink())) or (
+            claude_md.is_file() and "AGENTS.md" in claude_md.read_text(encoding="utf-8")
+        )
+        out.append(
+            CheckResult(
+                "CLAUDE.md -> AGENTS.md",
+                bridged,
+                "bridged" if bridged else "CLAUDE.md does not reference AGENTS.md",
+            )
+        )
+    return out
+
+
+def _agent_config_checks(root: Path) -> list[CheckResult]:
+    return _check_opencode(root) + _check_claude(root)
+
+
 def run_checks(root: Path | None = None) -> list[CheckResult]:
     root = root or Path.cwd()
     results: list[CheckResult] = []
@@ -86,22 +137,9 @@ def run_checks(root: Path | None = None) -> list[CheckResult]:
     else:
         results.append(CheckResult("prek.toml", False, "prek.toml missing"))
 
-    oc = root / "opencode.jsonc"
-    if oc.exists():
-        try:
-            data = json.loads(_strip_jsonc(oc.read_text(encoding="utf-8")))
-            need = [k for k in ("$schema", "plugin", "permission") if k not in data]
-            results.append(
-                CheckResult(
-                    "opencode.jsonc valid",
-                    not need,
-                    "ok" if not need else f"missing keys: {', '.join(need)}",
-                )
-            )
-        except (ValueError, OSError) as exc:
-            results.append(CheckResult("opencode.jsonc valid", False, f"parse error: {exc}"))
-    else:
-        results.append(CheckResult("opencode.jsonc", False, "missing"))
+    # Agent config is per-agent and optional: validate whatever is present rather than
+    # requiring opencode.jsonc. AGENTS.md (checked below) is the only universal requirement.
+    results += _agent_config_checks(root)
 
     schema = root / ".env.schema"
     if schema.exists():

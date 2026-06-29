@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Legacy single-agent env var (AGENT). Prefer ``agents`` (the resolved list).
     agent: str = "opencode"
     assume_yes: bool = False
     with_ci: bool = False
@@ -27,3 +28,13 @@ class Settings(BaseSettings):
     skip_varlock: bool = False
     no_deps: bool = False
     raw_base: str = DEFAULT_RAW_BASE
+
+    @property
+    def agents(self) -> list[str]:
+        """Resolved agent targets, parsed from the legacy ``agent`` value.
+
+        Accepts comma/slash-separated values (e.g. ``opencode,codex``); falls back
+        to ``["opencode"]`` when empty.
+        """
+        raw = [a.strip().lower() for a in self.agent.replace("/", ",").split(",")]
+        return list(dict.fromkeys([a for a in raw if a])) or ["opencode"]
